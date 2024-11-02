@@ -1,15 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useDispatch } from 'react-redux';
+import { motion } from 'framer-motion';
 import { FaHome, FaBriefcase, FaUsers } from 'react-icons/fa';
-import { addAddress } from '../store/LocationSlice';
+import { createAddress, updateAddress } from '../store/LocationSlice';
 import { Address } from '../types/address';
 
 interface AddressFormProps {
   location: { lat: number; lng: number };
   onSubmit: () => void;
+  editingAddress?: Address | null;
 }
 
-const AddressForm: React.FC<AddressFormProps> = ({ location, onSubmit }) => {
+const AddressForm: React.FC<AddressFormProps> = ({ location, onSubmit, editingAddress }) => {
   const dispatch = useDispatch();
   const [formData, setFormData] = useState({
     type: 'home',
@@ -21,115 +23,134 @@ const AddressForm: React.FC<AddressFormProps> = ({ location, onSubmit }) => {
     zipCode: '',
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  useEffect(() => {
+    if (editingAddress) {
+      setFormData({
+        type: editingAddress.type,
+        street: editingAddress.street,
+        apartment: editingAddress.apartment,
+        area: editingAddress.area,
+        city: editingAddress.city,
+        state: editingAddress.state,
+        zipCode: editingAddress.zipCode,
+      });
+    }
+  }, [editingAddress]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const newAddress: Address = {
-      id: Date.now().toString(),
+    const addressData = {
       ...formData,
       lat: location.lat,
       lng: location.lng,
-      isFavorite: false,
     };
-    dispatch(addAddress(newAddress));
+
+    if (editingAddress) {
+      await dispatch(updateAddress({
+        id: editingAddress.id,
+        address: addressData,
+      }));
+    } else {
+      await dispatch(createAddress({
+        ...addressData,
+        isFavorite: false,
+      }));
+    }
     onSubmit();
   };
+
+  const typeButtons = [
+    { type: 'home', icon: FaHome, label: 'Home' },
+    { type: 'office', icon: FaBriefcase, label: 'Office' },
+    { type: 'other', icon: FaUsers, label: 'Other' },
+  ];
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="flex gap-4 mb-6">
-        <button
-          type="button"
-          onClick={() => setFormData({ ...formData, type: 'home' })}
-          className={`flex-1 p-3 rounded-lg flex flex-col items-center gap-2 ${
-            formData.type === 'home' ? 'bg-blue-100 border-blue-500' : 'border'
-          }`}
-        >
-          <FaHome className="text-2xl" />
-          <span>Home</span>
-        </button>
-        <button
-          type="button"
-          onClick={() => setFormData({ ...formData, type: 'office' })}
-          className={`flex-1 p-3 rounded-lg flex flex-col items-center gap-2 ${
-            formData.type === 'office' ? 'bg-blue-100 border-blue-500' : 'border'
-          }`}
-        >
-          <FaBriefcase className="text-2xl" />
-          <span>Office</span>
-        </button>
-        <button
-          type="button"
-          onClick={() => setFormData({ ...formData, type: 'other' })}
-          className={`flex-1 p-3 rounded-lg flex flex-col items-center gap-2 ${
-            formData.type === 'other' ? 'bg-blue-100 border-blue-500' : 'border'
-          }`}
-        >
-          <FaUsers className="text-2xl" />
-          <span>Other</span>
-        </button>
+        {typeButtons.map(({ type, icon: Icon, label }) => (
+          <motion.button
+            key={type}
+            type="button"
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={() => setFormData({ ...formData, type })}
+            className={`flex-1 p-4 rounded-xl flex flex-col items-center gap-2 transition-all duration-200
+              ${formData.type === type 
+                ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-lg' 
+                : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'}`}
+          >
+            <Icon className="text-2xl" />
+            <span>{label}</span>
+          </motion.button>
+        ))}
       </div>
 
-      <input
-        type="text"
-        placeholder="Street Address"
-        value={formData.street}
-        onChange={(e) => setFormData({ ...formData, street: e.target.value })}
-        className="w-full p-2 border rounded-lg"
-        required
-      />
-
-      <input
-        type="text"
-        placeholder="Apartment/Suite"
-        value={formData.apartment}
-        onChange={(e) => setFormData({ ...formData, apartment: e.target.value })}
-        className="w-full p-2 border rounded-lg"
-      />
-
-      <input
-        type="text"
-        placeholder="Area"
-        value={formData.area}
-        onChange={(e) => setFormData({ ...formData, area: e.target.value })}
-        className="w-full p-2 border rounded-lg"
-        required
-      />
-
-      <div className="grid grid-cols-2 gap-4">
+      <motion.div className="space-y-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
         <input
           type="text"
-          placeholder="City"
-          value={formData.city}
-          onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-          className="w-full p-2 border rounded-lg"
+          placeholder="Street Address"
+          value={formData.street}
+          onChange={(e) => setFormData({ ...formData, street: e.target.value })}
+          className="input-field"
           required
         />
 
         <input
           type="text"
-          placeholder="State"
-          value={formData.state}
-          onChange={(e) => setFormData({ ...formData, state: e.target.value })}
-          className="w-full p-2 border rounded-lg"
+          placeholder="Apartment/Suite"
+          value={formData.apartment}
+          onChange={(e) => setFormData({ ...formData, apartment: e.target.value })}
+          className="input-field"
+        />
+
+        <input
+          type="text"
+          placeholder="Area"
+          value={formData.area}
+          onChange={(e) => setFormData({ ...formData, area: e.target.value })}
+          className="input-field"
           required
         />
-      </div>
 
-      <input
-        type="text"
-        placeholder="ZIP Code"
-        value={formData.zipCode}
-        onChange={(e) => setFormData({ ...formData, zipCode: e.target.value })}
-        className="w-full p-2 border rounded-lg"
-        required
-      />
+        <div className="grid grid-cols-2 gap-4">
+          <input
+            type="text"
+            placeholder="City"
+            value={formData.city}
+            onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+            className="input-field"
+            required
+          />
 
-      <button
-        type="submit"
-        className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition-colors"
-      >
-        Save Address
-      </button>
+          <input
+            type="text"
+            placeholder="State"
+            value={formData.state}
+            onChange={(e) => setFormData({ ...formData, state: e.target.value })}
+            className="input-field"
+            required
+          />
+        </div>
+
+        <input
+          type="text"
+          placeholder="ZIP Code"
+          value={formData.zipCode}
+          onChange={(e) => setFormData({ ...formData, zipCode: e.target.value })}
+          className="input-field"
+          required
+        />
+
+        <motion.button
+          type="submit"
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          className="btn-primary w-full"
+        >
+          {editingAddress ? 'Update Address' : 'Save Address'}
+        </motion.button>
+      </motion.div>
     </form>
   );
 };
